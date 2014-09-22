@@ -4,11 +4,12 @@
 // a crockford constructor for a GEOJSON FeatureCollection that can
 // return selected items from a web-requested geojson file, while
 // keeping all of them in a private variable
-function GEOJSON_FEATURE_FILTER(url){
+function GEOJSON_FEATURE_FILTER(url, indexFunc){
     // private member variables holding all headers and all features
     var headers = {};
     var features = [];
-    //var that = this;
+    
+    var index = null;
 
     // private function that splits geoJSON headers and features-array up
     // and stores them in the private variables headers and features respecitvely.
@@ -17,24 +18,9 @@ function GEOJSON_FEATURE_FILTER(url){
             features = data.features;
             delete data.features;
         }
-        for (var member in data){
-            headers[member] = data[member];
-        }
+        headers = data;
+        index = indexFunc(features);
     }
-
-    // private function that applies filterFunc to all features elements
-    // filterfunc should take a geojson feature and return either true or false
-    function filter(filterFunc, options){
-        var selected = [];
-        var length = features.length;
-        for (var i = 0; i < length; i += 1){
-            if (filterFunc(features[i], options) === true){
-                selected.push(features[i]);
-            }
-        }
-        return selected;
-    }
-
 
     // private function that wraps an array of features into a copy of the original headers
     function wrapInHeaders(selectedItems){
@@ -59,7 +45,9 @@ function GEOJSON_FEATURE_FILTER(url){
     // Returns null if filterfunc matched no items.
     // Returns a geoJSON object with the filtered subset of features otherwise.
     this.Filter = function(filterfunc, options){
-        var selected = filter(filterfunc, options);
+        index.filter = filterfunc;
+        var selected = index.filter(options);
+        
         if (selected.length === 0){
             console.debug('No Result found.');
             return null;
@@ -73,27 +61,45 @@ function GEOJSON_FEATURE_FILTER(url){
 // options should be an object with service names as keys and timing
 // information as in kitas.geojson as value or if it is an non timebased
 // service the value should be true
-function Filter(feature, options){
-    // go through all options, and comare them
-    for (var option in options){
-        // first we must discriminate timed and non-timed values
-        if (typeof(options[option]) === typeof(true)){
-            if (feature.properties.services[option] !== undefined){
-                return true;
-            }
-        } else {
-            if (feature.properties.services[option] !== undefined){
-                if (feature.properties.services[option].Max >= options[option].Max &&  feature.properties.services[option].Min <= options[option].Min){
-                    return true;
+function Filter(options){
+    var selected = {};
+    for (var serviceType in options){
+        for (var i=0; i<this[serviceType].length; i += 1){
+            if (this[serviceType][i].properties.services[serviceType].Max >= options[serviceType].Max &&
+                this[serviceType][i].properties.services[serviceType].Min <= options[serviceType].Min){
+                var id = this[serviceType][i].properties.id;
+                if (selected[id] === undefined){
+                    selected[id] = this[serviceType][i];
                 }
             }
         }
     }
-    return false;
+    return selected;
+}
+
+function indexFunc(features){
+    var serviceIndex = {
+        krippe: [],
+        elementar: [],
+        eingliederungshilfe: [],
+        vorschulklasse: [],
+        anschlBertrGTS: [],
+        anschlBertrGTSonder: [],
+        paedMittagsTisch: [],
+    };
+ 
+    for (var i=0; i<features.length; i += 1){
+        for (var serviceType in features[i].properties.services){
+            //console.debug("serviceType", serviceType);
+            serviceIndex[serviceType].push(features[i]);
+        }
+    }
+    
+    return serviceIndex;
 }
 
 // global kita filtering object
-var kitas = new GEOJSON_FEATURE_FILTER('kitas.geojson');
+var kitas = new GEOJSON_FEATURE_FILTER('kitas.geojson', indexFunc);
 
 $(document).ready(function() {
     // init Leaflet
@@ -172,7 +178,7 @@ $(document).ready(function() {
             $(this).slider().on('slideStop', function(){
                 var checkboxSelector = 'input.filterSelect#' + $(this).attr('id');
                 if (! $(checkboxSelector).prop('checked')){
-                  $(checkboxSelector).prop('checked', true);
+                    $(checkboxSelector).prop('checked', true);
                 }
                 updateMap();
             });
