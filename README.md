@@ -18,3 +18,6 @@ Die Kitafinder app für Hamburg.
 - benötigt vorher install
 - cmd-line: cd kitaHamburg/client
 - cmd-line: grunt serve
+
+[![Bitdeli Badge](https://d2weczhvl823v0.cloudfront.net/webtobesocial/kitahamburg/trend.png)](https://bitdeli.com/free "Bitdeli Badge")
+
